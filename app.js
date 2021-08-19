@@ -1,22 +1,28 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const path = require('path');
-const Campground = require("./models/campground");
 const methodOverride = require('method-override');
 const ejsMate = require("ejs-mate");
-const catchAsync = require('./utils/catchAsync');
-const ExpressError = require('./utils/ExpressError');
-const {campgroundSchema, reviewSchema} = require('./schemas.js');
+const session = require("express-session");
+const flash = require('connect-flash')
+
+const Campground = require("./models/campground");
 const Review = require('./models/review')
 
-const campgrounds = require('./routes/campgrounds'); 
+const ExpressError = require('./utils/ExpressError');
+const {campgroundSchema, reviewSchema} = require('./schemas.js');
 
+
+// Require Routes
+const campgrounds = require('./routes/campgrounds'); 
+const reviews = require('./routes/reviews'); 
 
 
 mongoose.connect('mongodb://localhost:27017/yelp-camp', {
     useNewUrlParser : true,
     useCreateIndex: true,
-    useUnifiedTopology: true
+    useUnifiedTopology: true,
+    useFindAndModify: false
 });
 
 const db = mongoose.connection;
@@ -33,45 +39,38 @@ app.set('view engine', 'ejs');
 
 //Needed to pass the response body during instanciation
 app.use(express.urlencoded({extended: true}));
-app.use(methodOverride('_method'));
-app.use('/campgrounds', campgrounds)
-
-//Middlewear function 
-const validateReview = (req,res,next) => {
-    const {error} = reviewSchema.validate(req.body);
-    if (error){
-        //iterate over errors and create a single string error message
-        const msg = error.details.map(el => el.message).join(',')
-        throw new ExpressError(msg, 400)
-    }else{
-        next(); 
-    }   
+app.use(methodOverride('_method')); //Neded for delete and put
+app.use(express.static(path.join(__dirname, 'public'))); // to be able to serve the public directory in our boilerplate ejs file
+const sessionConfig = {
+    secret: 'thisshouldbeabettersecret!',
+    resave: false,
+    saveUninitialized: true,
+    cookie: {
+        httpOnly: true,
+        expires: Date.now() + 1000 * 60 * 60 * 24 * 7,
+        maxAge: 1000 * 60 * 60 * 24 * 7
+    }
 }
+app.use(session(sessionConfig))
+app.use(flash());
 
-//HOME
+//Middlewear for flash on every single request
+app.use((req, res, next) => {
+    res.locals.success = req.flash('success');
+    res.locals.error = req.flash('error');
+    next();
+});
+
+
+//Using routes in appplication
+app.use('/campgrounds', campgrounds)
+app.use('/campgrounds/:id/reviews', reviews);
+
+
+//HOME ROUTE: needed? 
 app.get('/', (req, res) => {
     res.render('home')
-})
-
-///////////// REST ROUTES /////////////
-//ROUTE NAME: CREATE
-app.post('/campgrounds/:id/reviews', validateReview, catchAsync(async(req, res) =>{
-    const campground = await Campground.findById(req.params.id);
-    const review = new Review(req.body.review);
-    campground.reviews.push(review);
-    await review.save();
-    await campground.save();
-    res.redirect(`/campgrounds/${campground._id}`);
-}))
-
-//ROUTE NAME: DELETE
-app.delete('/campgrounds/:id/reviews/:reviewId', catchAsync( async(req, res) => {
-    const {id, reviewId} = req.params;
-    //using mongo operator $pull: take anything from reviews with given 'reviewId' and take it out or 'pull' it out
-    Campground.findByIdAndUpdate(id, {$pull: {reviews: reviewId}});
-    await Review.findByIdAndDelete(reviewId);
-    res.redirect(`/campgrounds/${id}`);
-}))
+});
 
 //404 Error
 app.all('*', (req,res,next) => {
