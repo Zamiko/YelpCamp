@@ -1,5 +1,6 @@
 
 const Campground = require("../models/campground");
+const {cloudinary} = require("../cloudinary");
 
 //ROUTE NAME: INDEX
 module.exports.index = async(req, res) => {
@@ -14,10 +15,11 @@ module.exports.renderNewForm = (req, res) => {
 
 //ROUTE NAME: CREATE
 module.exports.createCampground = async(req, res) => {
-    //if (!req.body.campground) throw new ExpressError("Invalid Campground Data", 400);
     const campground = new Campground(req.body.campground);
+    campground.images = req.files.map(f => ({url: f.path, filename: f.filename})); //array of images
     campground.author = req.user._id; //automatically added in when doing the auth steps
     await campground.save();
+    //console.log(campground);
     req.flash('success', 'Successfully made a new campground!');
     res.redirect(`/campgrounds/${campground._id}`)
 };
@@ -57,7 +59,19 @@ module.exports.renderEditForm = async(req, res) => {
 //ROUTE NAME: UPDATE
 module.exports.updateCampground = async(req, res) => {
     const {id} = req.params;
-    const campground = await Campground.findByIdAndUpdate(id,{...req.body.campground})
+    console.log(req.body);
+    const campground = await Campground.findByIdAndUpdate(id,{...req.body.campground});
+    const imgs = req.files.map(f => ({url: f.path, filename: f.filename})); //array of images
+    campground.images.push(...imgs); //array of images
+    await campground.save();
+    console.log('=========================================')
+    if(req.body.deleteImages){
+        for (let filename of req.body.deleteImages){ //delete from backend: cloudinary
+            await cloudinary.uploader.destroy(filename);
+        }
+        await campground.updateOne({ $pull: { images: { filename: { $in : req.body.deleteImages}}}})
+        console.log(campground)
+    }
     req.flash('success', 'Successfully updated campground!');
     res.redirect(`/campgrounds/${campground._id}`)
 };
@@ -69,3 +83,4 @@ module.exports.deleteCampground = async(req, res) => {
     req.flash('success', 'Successfully deleted a campground!');
     res.redirect('/campgrounds')
 };
+
