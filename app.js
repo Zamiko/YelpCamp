@@ -97,7 +97,7 @@ app.use('/campgrounds', campgroundRoutes)
 app.use('/campgrounds/:id/reviews', reviewRoutes);
 
 
-//HOME ROUTE: needed? 
+//HOME ROUTE:
 app.get('/', (req, res) => {
     res.render('home')
 });
