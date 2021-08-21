@@ -2,8 +2,6 @@ if(process.env.NODE_ENV !== "production") {
     require('dotenv').config();
 }
 
-
-
 const express = require('express');
 const mongoose = require('mongoose');
 const path = require('path');
@@ -14,23 +12,22 @@ const flash = require('connect-flash')
 const passport = require('passport');
 const LocalStrategy = require('passport-local');
 const mongoSanitize = require('express-mongo-sanitize');
-
 const Campground = require("./models/campground");
 const Review = require('./models/review')
 const User = require('./models/user')
-
-
 const ExpressError = require('./utils/ExpressError');
 const {campgroundSchema, reviewSchema} = require('./schemas.js');
-
 
 // Require Routes
 const userRoutes = require('./routes/users')
 const campgroundRoutes = require('./routes/campgrounds'); 
 const reviewRoutes = require('./routes/reviews'); 
 
+const MongoDBStore = require("connect-mongo");
 
-mongoose.connect('mongodb://localhost:27017/yelp-camp', {
+const dbUrl = process.env.DB_URL || 'mongodb://localhost:27017/yelp-camp';
+
+mongoose.connect(dbUrl, {
     useNewUrlParser : true,
     useCreateIndex: true,
     useUnifiedTopology: true,
@@ -54,8 +51,22 @@ app.set('view engine', 'ejs');
 app.use(express.urlencoded({extended: true})); //Needed to pass the response body during instanciation
 app.use(methodOverride('_method')); //Neded for delete and put
 app.use(express.static(path.join(__dirname, 'public'))); // to be able to serve the public directory in our boilerplate ejs file
+
+
+const secret = process.env.SECRET || 'thisshouldbeabettersecret!';
+const store = MongoDBStore.create({
+    mongoUrl: dbUrl,
+    secret,
+    touchAfter: 24 * 60 * 60  //24 hrs
+});
+
+store.on("error", function(e){
+    console.log("SESSION STORE ERROR", e);
+})
+
 const sessionConfig = {
-    secret: 'thisshouldbeabettersecret!', //this 'secret' is to sign cookies and verify its integrity: something hasnt changed
+    store,
+    secret, //this 'secret' is to sign cookies and verify its integrity: something hasnt changed
     resave: false,
     saveUninitialized: true,
     cookie: {
