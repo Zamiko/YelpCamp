@@ -34,3 +34,9 @@ body {
     color: #333;
     text-shadow: none;
 }
+
+.btn-secondary:hover{
+    box-shadow: 0 0.5em 0.5em -0.4em white;
+    transform: translateY(-0.15em);
+    transition: 0.20s;
+}
