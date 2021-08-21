@@ -13,10 +13,12 @@ const session = require("express-session");
 const flash = require('connect-flash')
 const passport = require('passport');
 const LocalStrategy = require('passport-local');
+const mongoSanitize = require('express-mongo-sanitize');
 
 const Campground = require("./models/campground");
 const Review = require('./models/review')
 const User = require('./models/user')
+
 
 const ExpressError = require('./utils/ExpressError');
 const {campgroundSchema, reviewSchema} = require('./schemas.js');
@@ -57,6 +59,7 @@ const sessionConfig = {
     resave: false,
     saveUninitialized: true,
     cookie: {
+        name: 'session',
         httpOnly: true,
         expires: Date.now() + 1000 * 60 * 60 * 24 * 7, //1 week
         maxAge: 1000 * 60 * 60 * 24 * 7
@@ -64,6 +67,9 @@ const sessionConfig = {
 }
 app.use(session(sessionConfig))
 app.use(flash());
+//middleware which sanitizes user-supplied data to prevent MongoDB Operator Injection.
+app.use(mongoSanitize());
+
 
 app.use(passport.initialize());
 app.use(passport.session()); //for persistent login sessions
